@@ -21,31 +21,34 @@ $.extend(MediaElementPlayer.prototype, {
 			
 		media.addEventListener('play', function() {
 			if (typeof _gaq != 'undefined') {
-				_gaq.push(['_trackEvent', 
+				ev = ['_trackEvent',
 					player.options.googleAnalyticsCategory, 
 					player.options.googleAnalyticsEventPlay, 
-					(player.options.googleAnalyticsTitle === '') ? player.currentSrc : player.options.googleAnalyticsTitle
-				]);
+					player.media.currentSrc.substring(player.media.currentSrc.lastIndexOf('/')+1)
+				];
+				_gaq.push(ev);
 			}
 		}, false);
 		
 		media.addEventListener('pause', function() {
 			if (typeof _gaq != 'undefined') {
-				_gaq.push(['_trackEvent', 
+				ev = ['_trackEvent',
 					player.options.googleAnalyticsCategory, 
 					player.options.googleAnalyticsEventPause, 
-					(player.options.googleAnalyticsTitle === '') ? player.currentSrc : player.options.googleAnalyticsTitle
-				]);
+					player.media.currentSrc.substring(player.media.currentSrc.lastIndexOf('/')+1)
+				];
+				_gaq.push(ev);
 			}
 		}, false);	
 		
 		media.addEventListener('ended', function() {
 			if (typeof _gaq != 'undefined') {
-				_gaq.push(['_trackEvent', 
+				ev = ['_trackEvent',
 					player.options.googleAnalyticsCategory, 
 					player.options.googleAnalyticsEventEnded, 
-					(player.options.googleAnalyticsTitle === '') ? player.currentSrc : player.options.googleAnalyticsTitle
-				]);
+					player.media.currentSrc.substring(player.media.currentSrc.lastIndexOf('/')+1)
+				];
+				_gaq.push(ev);
 			}
 		}, false);
 		
