@@ -42,7 +42,7 @@ mep_files.append('mep-feature-volume.js')
 mep_files.append('mep-feature-fullscreen.js')
 mep_files.append('mep-feature-tracks.js')
 mep_files.append('mep-feature-contextmenu.js')
-# mep_files.append('mep-feature-sourcechooser.js')
+mep_files.append('mep-feature-sourcechooser.js')
 
 code = ''
 
@@ -74,14 +74,14 @@ def addHeader(headerFilename, filename):
 	tmp_file = open(filename)
 	file_txt = tmp_file.read()
 	tmp_file.close()
-	
+
 	# open the file again for writing
 	tmp_file = open(filename, 'w')
 	tmp_file.write(header_txt)
 	# write the original contents
 	tmp_file.write(file_txt)
 	tmp_file.close()
-	
+
 addHeader('js/me-header.js', '../build/' + me_filename + '.min.js')
 addHeader('js/mep-header.js', '../build/' + mep_filename + '.min.js')
 
