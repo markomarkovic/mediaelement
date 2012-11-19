@@ -99,7 +99,7 @@
 						newLeft = totalWidth * volume;
 	
 					// handle
-					volumeHandle.css('left', Math.round(totalPosition.left + newLeft - (volumeHandle.width() / 2));
+					volumeHandle.css('left', Math.round(totalPosition.left + newLeft - (volumeHandle.width() / 2)));
 	
 					// rezize the current part of the volume bar
 					volumeCurrent.width(Math.round(newLeft));
