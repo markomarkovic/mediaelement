@@ -1801,7 +1801,8 @@ window.MediaElement = mejs.MediaElement;
     exports.de = {
         "Fullscreen" : "Vollbild",
         "Go Fullscreen" : "Vollbild an",
-        "Turn off Fullscreen" : "Vollbild aus"
+        "Turn off Fullscreen" : "Vollbild aus",
+        "Close" : "Schließen"
     };
 
 }(mejs.i18n.locale.strings));
@@ -2544,15 +2545,15 @@ if (typeof jQuery != 'undefined') {
 				var 
 					nativeWidth = t.isVideo ? ((t.media.videoWidth && t.media.videoWidth > 0) ? t.media.videoWidth : t.options.defaultVideoWidth) : t.options.defaultAudioWidth,
 					nativeHeight = t.isVideo ? ((t.media.videoHeight && t.media.videoHeight > 0) ? t.media.videoHeight : t.options.defaultVideoHeight) : t.options.defaultAudioHeight,
-					parentWidth = t.container.parent().width(),
-					newHeight = parseInt(parentWidth * nativeHeight/nativeWidth, 10);
+					parentWidth = t.container.parent().closest(':visible').width(),
+					newHeight = t.isVideo || !t.options.autosizeProgress ? parseInt(parentWidth * nativeHeight/nativeWidth, 10) : nativeHeight;
 					
 				if (t.container.parent()[0].tagName.toLowerCase() === 'body') { // && t.container.siblings().count == 0) {
 					parentWidth = $(window).width();
 					newHeight = $(window).height();
 				}
 				
-				if ( newHeight != 0 ) {
+				if ( newHeight != 0 && parentWidth != 0 ) {
 					// set outer container size
 					t.container
 						.width(parentWidth)
@@ -4642,6 +4643,110 @@ $.extend(mejs.MepDefaults,
 			}
 		}
 	});
+
+})(mejs.$);
+// HD/SD Button Plugin
+(function($) {
+
+	$.extend(mejs.MepDefaults, {
+		hdsdText: 'HD/SD'
+	});
+
+	$.extend(MediaElementPlayer.prototype, {
+		buildhdsd: function(player, controls, layers, media) {
+				var t = this;
+				var srcType = '';
+				var currentSrc = '';
+				var currentTime = 0;
+				var paused = true;
+				var typeSrcs = {
+					'type' : Array(),
+					'quality' : Array(),
+					'src' : Array()
+				};
+				var hdbtn =
+				$('<div class="mejs-button mejs-hd-button mejs-sd" >' +
+					'<button type="button" aria-controls="' + t.id + '" title="' + t.options.hdsdText + '"></button>' +
+				'</div>')
+				.appendTo(controls)
+
+				// handle clicks to the hd/sd button
+				.delegate('.mejs-hd-button > button', 'click', function() {
+
+					currentSrc = media.currentSrc;
+					paused = media.paused;
+					currentTime = media.currentTime;
+
+					// find original source element
+					for (var i in media.children) {
+						src = media.children[i];
+						if (src.nodeName === 'SOURCE' && src.src == currentSrc) {
+							//we found the original source element.
+							srcType = $(src).attr('type');
+						}
+					}
+
+					if (srcType !== '' && !typeSrcs.src.length) {
+						// store list of types + data-quality
+
+						for (i in media.children) {
+							src = media.children[i];
+							if (
+								src.nodeName === 'SOURCE'
+								&& $(src).attr('type') == srcType
+								&& typeSrcs.src.indexOf($(src).attr('src'))
+								&& (media.canPlayType(src.type) == 'probably' || media.canPlayType(src.type) == 'maybe')
+								) {
+									typeSrcs.type.push( $(src).attr('type') );
+									typeSrcs.src.push( $(src).attr('src') );
+									if ($(src).attr('data-quality')) {
+										typeSrcs.quality.push($(src).attr('data-quality'));
+									} else {
+										typeSrcs.quality.push('sd');
+									}
+								}
+						}
+					}
+
+
+					if (hdbtn.hasClass('mejs-sd')) {
+						//make it HD
+						switchVideoSource(media, typeSrcs, 'hd');
+						hdbtn.removeClass('mejs-sd').addClass('mejs-hd');
+					} else {
+						//make it SD
+						switchVideoSource(media, typeSrcs, 'sd');
+						hdbtn.removeClass('mejs-hd').addClass('mejs-sd');
+					}
+
+					// wait for js
+					setTimeout(function() {
+						if (!paused) {
+							$('.mejs-playpause-button').click();
+						}
+						// wait until ready to play
+						media.addEventListener('loadeddata', function (e) {
+							media.setCurrentTime(currentTime);
+							//media.play();
+
+						}, false);
+					}, 250);
+
+
+				});
+
+		}
+	});
+
+	function switchVideoSource( media, typeSrcs, quality ) {
+		for (var i in typeSrcs.type) {
+			q = typeSrcs.quality[i];
+			if (q === quality) {
+				media.pause();
+				media.setSrc(typeSrcs.src[i]);
+			}
+		}
+	}
 
 })(mejs.$);
 
