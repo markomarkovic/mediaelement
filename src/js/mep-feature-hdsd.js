@@ -23,7 +23,7 @@
 				'</div>')
 				.appendTo(controls)
 
-				// handle clicks to the language radio buttons
+				// handle clicks to the hd/sd button
 				.delegate('.mejs-hd-button > button', 'click', function() {
 
 					currentSrc = media.currentSrc;
@@ -31,7 +31,7 @@
 					currentTime = media.currentTime;
 
 					// find original source element
-					for (i in media.children) {
+					for (var i in media.children) {
 						src = media.children[i];
 						if (src.nodeName === 'SOURCE' && src.src == currentSrc) {
 							//we found the original source element.
@@ -39,7 +39,7 @@
 						}
 					}
 
-					if (srcType != '' && !typeSrcs.src.length) {
+					if (srcType !== '' && !typeSrcs.src.length) {
 						// store list of types + data-quality
 
 						for (i in media.children) {
@@ -48,6 +48,7 @@
 								src.nodeName === 'SOURCE'
 								&& $(src).attr('type') == srcType
 								&& typeSrcs.src.indexOf($(src).attr('src'))
+								&& (media.canPlayType(src.type) == 'probably' || media.canPlayType(src.type) == 'maybe')
 								) {
 									typeSrcs.type.push( $(src).attr('type') );
 									typeSrcs.src.push( $(src).attr('src') );
@@ -91,7 +92,7 @@
 	});
 
 	function switchVideoSource( media, typeSrcs, quality ) {
-		for (i in typeSrcs.type) {
+		for (var i in typeSrcs.type) {
 			q = typeSrcs.quality[i];
 			if (q === quality) {
 				media.pause();
