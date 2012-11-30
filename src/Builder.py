@@ -135,4 +135,7 @@ shutil.copy2('css/controls-ted.png','../build/controls-ted.png')
 shutil.copy2('css/controls-wmp.png','../build/controls-wmp.png')
 shutil.copy2('css/controls-wmp-bg.png','../build/controls-wmp-bg.png')
 
+# WAVE
+shutil.copy2('css/wave_player_skin.css','../build/wave_player_skin.css')
+
 print('DONE!')
