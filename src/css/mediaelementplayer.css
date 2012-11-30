@@ -837,3 +837,13 @@
 	cursor: pointer;
 }
 /* End: Postroll */
+
+
+/* Start: HD/SD */
+.mejs-controls .mejs-hd button {
+	background-position: -144px -16px;
+}
+.mejs-controls .mejs-sd button {
+	background-position: -144px 0;
+}
+/* End: HD/SD */
