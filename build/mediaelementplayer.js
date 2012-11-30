@@ -264,7 +264,7 @@ if (typeof jQuery != 'undefined') {
 
 				// build container
 				t.container =
-					$('<div id="' + t.id + '" class="mejs-container">'+
+					$('<div id="' + t.id + '" class="mejs-container ' + (mejs.MediaFeatures.svg ? 'svg' : 'no-svg') + '">'+
 						'<div class="mejs-inner">'+
 							'<div class="mejs-mediaelement"></div>'+
 							'<div class="mejs-layers"></div>'+
@@ -734,23 +734,23 @@ if (typeof jQuery != 'undefined') {
 			
 				// do we have the native dimensions yet?
 				var 
-					nativeWidth = (t.media.videoWidth && t.media.videoWidth > 0) ? t.media.videoWidth : t.options.defaultVideoWidth,
-					nativeHeight = (t.media.videoHeight && t.media.videoHeight > 0) ? t.media.videoHeight : t.options.defaultVideoHeight,
-					parentWidth = t.container.parent().width(),
-					newHeight = parseInt(parentWidth * nativeHeight/nativeWidth, 10);
+					nativeWidth = t.isVideo ? ((t.media.videoWidth && t.media.videoWidth > 0) ? t.media.videoWidth : t.options.defaultVideoWidth) : t.options.defaultAudioWidth,
+					nativeHeight = t.isVideo ? ((t.media.videoHeight && t.media.videoHeight > 0) ? t.media.videoHeight : t.options.defaultVideoHeight) : t.options.defaultAudioHeight,
+					parentWidth = t.container.parent().closest(':visible').width(),
+					newHeight = t.isVideo || !t.options.autosizeProgress ? parseInt(parentWidth * nativeHeight/nativeWidth, 10) : nativeHeight;
 					
 				if (t.container.parent()[0].tagName.toLowerCase() === 'body') { // && t.container.siblings().count == 0) {
 					parentWidth = $(window).width();
 					newHeight = $(window).height();
 				}
 				
-				if ( newHeight != 0 ) {
+				if ( newHeight != 0 && parentWidth != 0 ) {
 					// set outer container size
 					t.container
 						.width(parentWidth)
 						.height(newHeight);
 						
-					// set native <video>
+					// set native <video> or <audio>
 					t.$media
 						.width('100%')
 						.height('100%');
@@ -1467,7 +1467,7 @@ if (typeof jQuery != 'undefined') {
 
 			positionVolumeHandle = function(volume, secondTry) {
 
-				if (!volumeSlider.is(':visible') && typeof secondTry != 'undefined') {
+				if (!volumeSlider.is(':visible') && typeof secondTry === 'undefined') {
 					volumeSlider.show();
 					positionVolumeHandle(volume, true);
 					volumeSlider.hide()
@@ -1500,11 +1500,11 @@ if (typeof jQuery != 'undefined') {
 						newTop = totalHeight - (totalHeight * volume);
 	
 					// handle
-					volumeHandle.css('top', totalPosition.top + newTop - (volumeHandle.height() / 2));
+					volumeHandle.css(Math.round('top', totalPosition.top + newTop - (volumeHandle.height() / 2)));
 	
 					// show the current visibility
-					volumeCurrent.height(totalHeight - newTop );
-					volumeCurrent.css('top', totalPosition.top + newTop);
+					volumeCurrent.height(Math.round(totalHeight - newTop));
+					volumeCurrent.css('top', Math.round(totalPosition.top + newTop));
 				} else {
 					var 
 					
@@ -1518,10 +1518,10 @@ if (typeof jQuery != 'undefined') {
 						newLeft = totalWidth * volume;
 	
 					// handle
-					volumeHandle.css('left', totalPosition.left + newLeft - (volumeHandle.width() / 2));
+					volumeHandle.css('left', Math.round(totalPosition.left + newLeft - (volumeHandle.width() / 2)));
 	
 					// rezize the current part of the volume bar
-					volumeCurrent.width( newLeft );
+					volumeCurrent.width(Math.round(newLeft));
 				}
 			},
 			handleVolumeMove = function(e) {
@@ -2802,3 +2802,192 @@ $.extend(mejs.MepDefaults,
 	});
 	
 })(mejs.$);
+/**
+ * Postroll plugin
+ */
+(function($) {
+
+	$.extend(mejs.MepDefaults, {
+		postrollCloseText: mejs.i18n.t('Close')
+	});
+
+	// Postroll
+	$.extend(MediaElementPlayer.prototype, {
+		buildpostroll: function(player, controls, layers, media) {
+			var
+				t = this,
+				postrollLink = t.container.find('link[rel="postroll"]').attr('href');
+
+			if (typeof postrollLink !== 'undefined') {
+				player.postroll =
+					$('<div class="mejs-postroll-layer mejs-layer"><a class="mejs-postroll-close" onclick="$(this).parent().hide();return false;">' + t.options.postrollCloseText + '</a><div class="mejs-postroll-layer-content"></div></div>').prependTo(layers).hide();
+
+				t.media.addEventListener('ended', function (e) {
+					$.ajax({
+						dataType: 'html',
+						url: postrollLink,
+						success: function (data, textStatus) {
+							layers.find('.mejs-postroll-layer-content').html(data);
+						}
+					});
+					player.postroll.show();
+				}, false);
+			}
+		}
+	});
+
+})(mejs.$);
+// Source Chooser Plugin
+(function($) {
+
+	$.extend(mejs.MepDefaults, {
+		sourcechooserText: 'Source Chooser'
+	});
+
+	$.extend(MediaElementPlayer.prototype, {
+		buildsourcechooser: function(player, controls, layers, media) {
+
+			var t = this;
+
+			player.sourcechooserButton =
+				$('<div class="mejs-button mejs-sourcechooser-button">'+
+					'<button type="button" aria-controls="' + t.id + '" title="' + t.options.sourcechooserText + '"></button>'+
+					'<div class="mejs-sourcechooser-selector">'+
+						'<ul>'+
+						'</ul>'+
+					'</div>'+
+				'</div>')
+					.appendTo(controls)
+
+					// hover
+					.hover(function() {
+						$(this).find('.mejs-sourcechooser-selector').css('visibility','visible');
+					}, function() {
+						$(this).find('.mejs-sourcechooser-selector').css('visibility','hidden');
+					})
+
+					// handle clicks to the language radio buttons
+					.delegate('input[type=radio]', 'click', function() {
+						src = this.value;
+
+						if (media.currentSrc != src) {
+							currentTime = media.currentTime;
+							paused = media.paused;
+							media.setSrc(src);
+							if (!paused) {
+								media.play();
+							}
+						}
+					});
+
+			// add to list
+			for (i in media.children) {
+				src = media.children[i];
+				if (src.nodeName === 'SOURCE' && (media.canPlayType(src.type) == 'probably' || media.canPlayType(src.type) == 'maybe')) {
+					player.addSourceButton(src.src, src.title, src.type, media.src == src.src);
+				}
+			}
+
+		},
+
+		addSourceButton: function(src, label, type, isCurrent) {
+			var t = this;
+			if (label === '' || label == undefined) {
+				label = src;
+			}
+			type = type.split('/')[1];
+
+			t.sourcechooserButton.find('ul').append(
+				$('<li>'+
+					'<input type="radio" name="' + t.id + '_sourcechooser" id="' + t.id + '_sourcechooser_' + label + type + '" value="' + src + '" ' + (isCurrent ? 'checked="checked"' : '') + ' />'+
+					'<label for="' + t.id + '_sourcechooser_' + label + type + '">' + label + ' (' + type + ')</label>'+
+				'</li>')
+			);
+
+			t.adjustSourcechooserBox();
+
+		},
+
+		adjustSourcechooserBox: function() {
+			var t = this;
+			// adjust the size of the outer box
+			t.sourcechooserButton.find('.mejs-sourcechooser-selector').height(
+				t.sourcechooserButton.find('.mejs-sourcechooser-selector ul').outerHeight(true)
+			);
+		}
+	});
+
+})(mejs.$);
+
+/*
+* Google Analytics Plugin
+* Requires
+*
+*/
+
+(function($) {
+
+$.extend(mejs.MepDefaults, {
+	googleAnalyticsTitle: '',
+	googleAnalyticsCategory: 'Videos',
+	googleAnalyticsEventPlay: 'Play',
+	googleAnalyticsEventPause: 'Pause',
+	googleAnalyticsEventEnded: 'Ended',
+	googleAnalyticsEventTime: 'Time'
+});
+
+
+$.extend(MediaElementPlayer.prototype, {
+	buildgoogleanalytics: function(player, controls, layers, media) {
+			
+		media.addEventListener('play', function() {
+			if (typeof _gaq != 'undefined') {
+				ev = ['_trackEvent',
+					player.options.googleAnalyticsCategory, 
+					player.options.googleAnalyticsEventPlay, 
+					player.media.currentSrc.substring(player.media.currentSrc.lastIndexOf('/')+1)
+				];
+				_gaq.push(ev);
+			}
+		}, false);
+		
+		media.addEventListener('pause', function() {
+			if (typeof _gaq != 'undefined') {
+				ev = ['_trackEvent',
+					player.options.googleAnalyticsCategory, 
+					player.options.googleAnalyticsEventPause, 
+					player.media.currentSrc.substring(player.media.currentSrc.lastIndexOf('/')+1)
+				];
+				_gaq.push(ev);
+			}
+		}, false);	
+		
+		media.addEventListener('ended', function() {
+			if (typeof _gaq != 'undefined') {
+				ev = ['_trackEvent',
+					player.options.googleAnalyticsCategory, 
+					player.options.googleAnalyticsEventEnded, 
+					player.media.currentSrc.substring(player.media.currentSrc.lastIndexOf('/')+1)
+				];
+				_gaq.push(ev);
+			}
+		}, false);
+		
+		/*
+		media.addEventListener('timeupdate', function() {
+			if (typeof _gaq != 'undefined') {
+				_gaq.push(['_trackEvent', 
+					player.options.googleAnalyticsCategory, 
+					player.options.googleAnalyticsEventEnded, 
+					player.options.googleAnalyticsTime,
+					(player.options.googleAnalyticsTitle === '') ? player.currentSrc : player.options.googleAnalyticsTitle,
+					player.currentTime
+				]);
+			}
+		}, true);
+		*/
+	}
+});
+	
+})(mejs.$);
+

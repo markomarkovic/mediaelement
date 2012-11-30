@@ -15,7 +15,7 @@
 var mejs = mejs || {};
 
 // version number
-mejs.version = '2.9.5';
+mejs.version = '2.10.0';
 
 // player number (for missing, same id attr)
 mejs.meIndex = 0;
@@ -33,7 +33,7 @@ mejs.plugins = {
 		{version: null, types: ['video/youtube', 'video/x-youtube']}
 	],
 	vimeo: [
-		{version: null, types: ['video/vimeo']}
+		{version: null, types: ['video/vimeo', 'video/x-vimeo']}
 	]
 };
 
@@ -303,6 +303,10 @@ mejs.MediaFeatures = {
 		t.isGecko = (ua.match(/gecko/gi) !== null) && !t.isWebkit;
 		t.isOpera = (ua.match(/opera/gi) !== null);
 		t.hasTouch = ('ontouchstart' in window);
+		
+		// borrowed from Modernizr
+		t.svg = !! document.createElementNS &&
+				!! document.createElementNS('http://www.w3.org/2000/svg','svg').createSVGRect;
 
 		// create HTML5 media elements for IE before 9, get a <video> element for fullscreen detection
 		for (i=0; i<html5Elements.length; i++) {
@@ -899,7 +903,8 @@ mejs.HtmlMediaElementShim = {
 			pluginName,
 			pluginVersions,
 			pluginInfo,
-			dummy;
+			dummy,
+			media;
 			
 		// STEP 1: Get URL and type from <video src> or <source src>
 
@@ -929,7 +934,11 @@ mejs.HtmlMediaElementShim = {
 				if (n.nodeType == 1 && n.tagName.toLowerCase() == 'source') {
 					src = n.getAttribute('src');
 					type = this.formatType(src, n.getAttribute('type'));
-					mediaFiles.push({type:type, url:src});
+					media = n.getAttribute('media');
+
+					if (!media || !window.matchMedia || (window.matchMedia && window.matchMedia(media).matches)) {
+						mediaFiles.push({type:type, url:src});
+					}
 				}
 			}
 		}
@@ -1060,6 +1069,7 @@ mejs.HtmlMediaElementShim = {
 	},
 	
 	getTypeFromFile: function(url) {
+		url = url.split('?')[0];
 		var ext = url.substring(url.lastIndexOf('.') + 1);
 		return (/(mp4|m4v|ogg|ogv|webm|webmv|flv|wmv|mpeg|mov)/gi.test(ext) ? 'video' : 'audio') + '/' + this.getTypeFromExtension(ext);
 	},
@@ -1097,7 +1107,7 @@ mejs.HtmlMediaElementShim = {
 
 		errorContainer.innerHTML = (poster !== '') ?
 			'<a href="' + playback.url + '"><img src="' + poster + '" width="100%" height="100%" /></a>' :
-			'<a href="' + playback.url + '"><span>Download File</span></a>';
+			'<a href="' + playback.url + '"><span>' + mejs.i18n.t('Download File') + '</span></a>';
 
 		htmlMediaElement.parentNode.insertBefore(errorContainer, htmlMediaElement);
 		htmlMediaElement.style.display = 'none';
@@ -1277,6 +1287,9 @@ mejs.HtmlMediaElementShim = {
 				
 				pluginMediaElement.vimeoid = playback.url.substr(playback.url.lastIndexOf('/')+1);
 				
+				container.innerHTML ='<iframe src="http://player.vimeo.com/video/' + pluginMediaElement.vimeoid + '?portrait=0&byline=0&title=0" width="' + width +'" height="' + height +'" frameborder="0"></iframe>';
+				
+				/*
 				container.innerHTML =
 					'<object width="' + width + '" height="' + height + '">' +
 						'<param name="allowfullscreen" value="true" />' +
@@ -1285,7 +1298,8 @@ mejs.HtmlMediaElementShim = {
 						'<param name="movie" value="http://vimeo.com/moogaloop.swf?clip_id=' + pluginMediaElement.vimeoid  + '&amp;server=vimeo.com&amp;show_title=0&amp;show_byline=0&amp;show_portrait=0&amp;color=00adef&amp;fullscreen=1&amp;autoplay=0&amp;loop=0" />' +
 						'<embed src="//vimeo.com/moogaloop.swf?api=1&amp;clip_id=' + pluginMediaElement.vimeoid + '&amp;server=vimeo.com&amp;show_title=0&amp;show_byline=0&amp;show_portrait=0&amp;color=00adef&amp;fullscreen=1&amp;autoplay=0&amp;loop=0" type="application/x-shockwave-flash" allowfullscreen="true" allowscriptaccess="always" width="' + width + '" height="' + height + '"></embed>' +
 					'</object>';
-					
+					*/
+									
 				break;			
 		}
 		// hide original element
@@ -1787,7 +1801,8 @@ window.MediaElement = mejs.MediaElement;
     exports.de = {
         "Fullscreen" : "Vollbild",
         "Go Fullscreen" : "Vollbild an",
-        "Turn off Fullscreen" : "Vollbild aus"
+        "Turn off Fullscreen" : "Vollbild aus",
+        "Close" : "Schließen"
     };
 
 }(mejs.i18n.locale.strings));
@@ -2058,7 +2073,7 @@ if (typeof jQuery != 'undefined') {
 
 				// build container
 				t.container =
-					$('<div id="' + t.id + '" class="mejs-container">'+
+					$('<div id="' + t.id + '" class="mejs-container ' + (mejs.MediaFeatures.svg ? 'svg' : 'no-svg') + '">'+
 						'<div class="mejs-inner">'+
 							'<div class="mejs-mediaelement"></div>'+
 							'<div class="mejs-layers"></div>'+
@@ -2528,23 +2543,23 @@ if (typeof jQuery != 'undefined') {
 			
 				// do we have the native dimensions yet?
 				var 
-					nativeWidth = (t.media.videoWidth && t.media.videoWidth > 0) ? t.media.videoWidth : t.options.defaultVideoWidth,
-					nativeHeight = (t.media.videoHeight && t.media.videoHeight > 0) ? t.media.videoHeight : t.options.defaultVideoHeight,
-					parentWidth = t.container.parent().width(),
-					newHeight = parseInt(parentWidth * nativeHeight/nativeWidth, 10);
+					nativeWidth = t.isVideo ? ((t.media.videoWidth && t.media.videoWidth > 0) ? t.media.videoWidth : t.options.defaultVideoWidth) : t.options.defaultAudioWidth,
+					nativeHeight = t.isVideo ? ((t.media.videoHeight && t.media.videoHeight > 0) ? t.media.videoHeight : t.options.defaultVideoHeight) : t.options.defaultAudioHeight,
+					parentWidth = t.container.parent().closest(':visible').width(),
+					newHeight = t.isVideo || !t.options.autosizeProgress ? parseInt(parentWidth * nativeHeight/nativeWidth, 10) : nativeHeight;
 					
 				if (t.container.parent()[0].tagName.toLowerCase() === 'body') { // && t.container.siblings().count == 0) {
 					parentWidth = $(window).width();
 					newHeight = $(window).height();
 				}
 				
-				if ( newHeight != 0 ) {
+				if ( newHeight != 0 && parentWidth != 0 ) {
 					// set outer container size
 					t.container
 						.width(parentWidth)
 						.height(newHeight);
 						
-					// set native <video>
+					// set native <video> or <audio>
 					t.$media
 						.width('100%')
 						.height('100%');
@@ -3261,7 +3276,7 @@ if (typeof jQuery != 'undefined') {
 
 			positionVolumeHandle = function(volume, secondTry) {
 
-				if (!volumeSlider.is(':visible') && typeof secondTry != 'undefined') {
+				if (!volumeSlider.is(':visible') && typeof secondTry === 'undefined') {
 					volumeSlider.show();
 					positionVolumeHandle(volume, true);
 					volumeSlider.hide()
@@ -3294,11 +3309,11 @@ if (typeof jQuery != 'undefined') {
 						newTop = totalHeight - (totalHeight * volume);
 	
 					// handle
-					volumeHandle.css('top', totalPosition.top + newTop - (volumeHandle.height() / 2));
+					volumeHandle.css(Math.round('top', totalPosition.top + newTop - (volumeHandle.height() / 2)));
 	
 					// show the current visibility
-					volumeCurrent.height(totalHeight - newTop );
-					volumeCurrent.css('top', totalPosition.top + newTop);
+					volumeCurrent.height(Math.round(totalHeight - newTop));
+					volumeCurrent.css('top', Math.round(totalPosition.top + newTop));
 				} else {
 					var 
 					
@@ -3312,10 +3327,10 @@ if (typeof jQuery != 'undefined') {
 						newLeft = totalWidth * volume;
 	
 					// handle
-					volumeHandle.css('left', totalPosition.left + newLeft - (volumeHandle.width() / 2));
+					volumeHandle.css('left', Math.round(totalPosition.left + newLeft - (volumeHandle.width() / 2)));
 	
 					// rezize the current part of the volume bar
-					volumeCurrent.width( newLeft );
+					volumeCurrent.width(Math.round(newLeft));
 				}
 			},
 			handleVolumeMove = function(e) {
@@ -4596,4 +4611,193 @@ $.extend(mejs.MepDefaults,
 	});
 	
 })(mejs.$);
+/**
+ * Postroll plugin
+ */
+(function($) {
+
+	$.extend(mejs.MepDefaults, {
+		postrollCloseText: mejs.i18n.t('Close')
+	});
+
+	// Postroll
+	$.extend(MediaElementPlayer.prototype, {
+		buildpostroll: function(player, controls, layers, media) {
+			var
+				t = this,
+				postrollLink = t.container.find('link[rel="postroll"]').attr('href');
+
+			if (typeof postrollLink !== 'undefined') {
+				player.postroll =
+					$('<div class="mejs-postroll-layer mejs-layer"><a class="mejs-postroll-close" onclick="$(this).parent().hide();return false;">' + t.options.postrollCloseText + '</a><div class="mejs-postroll-layer-content"></div></div>').prependTo(layers).hide();
+
+				t.media.addEventListener('ended', function (e) {
+					$.ajax({
+						dataType: 'html',
+						url: postrollLink,
+						success: function (data, textStatus) {
+							layers.find('.mejs-postroll-layer-content').html(data);
+						}
+					});
+					player.postroll.show();
+				}, false);
+			}
+		}
+	});
+
+})(mejs.$);
+// Source Chooser Plugin
+(function($) {
+
+	$.extend(mejs.MepDefaults, {
+		sourcechooserText: 'Source Chooser'
+	});
+
+	$.extend(MediaElementPlayer.prototype, {
+		buildsourcechooser: function(player, controls, layers, media) {
+
+			var t = this;
+
+			player.sourcechooserButton =
+				$('<div class="mejs-button mejs-sourcechooser-button">'+
+					'<button type="button" aria-controls="' + t.id + '" title="' + t.options.sourcechooserText + '"></button>'+
+					'<div class="mejs-sourcechooser-selector">'+
+						'<ul>'+
+						'</ul>'+
+					'</div>'+
+				'</div>')
+					.appendTo(controls)
+
+					// hover
+					.hover(function() {
+						$(this).find('.mejs-sourcechooser-selector').css('visibility','visible');
+					}, function() {
+						$(this).find('.mejs-sourcechooser-selector').css('visibility','hidden');
+					})
+
+					// handle clicks to the language radio buttons
+					.delegate('input[type=radio]', 'click', function() {
+						src = this.value;
+
+						if (media.currentSrc != src) {
+							currentTime = media.currentTime;
+							paused = media.paused;
+							media.setSrc(src);
+							if (!paused) {
+								media.play();
+							}
+						}
+					});
+
+			// add to list
+			for (i in media.children) {
+				src = media.children[i];
+				if (src.nodeName === 'SOURCE' && (media.canPlayType(src.type) == 'probably' || media.canPlayType(src.type) == 'maybe')) {
+					player.addSourceButton(src.src, src.title, src.type, media.src == src.src);
+				}
+			}
+
+		},
+
+		addSourceButton: function(src, label, type, isCurrent) {
+			var t = this;
+			if (label === '' || label == undefined) {
+				label = src;
+			}
+			type = type.split('/')[1];
+
+			t.sourcechooserButton.find('ul').append(
+				$('<li>'+
+					'<input type="radio" name="' + t.id + '_sourcechooser" id="' + t.id + '_sourcechooser_' + label + type + '" value="' + src + '" ' + (isCurrent ? 'checked="checked"' : '') + ' />'+
+					'<label for="' + t.id + '_sourcechooser_' + label + type + '">' + label + ' (' + type + ')</label>'+
+				'</li>')
+			);
+
+			t.adjustSourcechooserBox();
+
+		},
+
+		adjustSourcechooserBox: function() {
+			var t = this;
+			// adjust the size of the outer box
+			t.sourcechooserButton.find('.mejs-sourcechooser-selector').height(
+				t.sourcechooserButton.find('.mejs-sourcechooser-selector ul').outerHeight(true)
+			);
+		}
+	});
+
+})(mejs.$);
+
+/*
+* Google Analytics Plugin
+* Requires
+*
+*/
+
+(function($) {
+
+$.extend(mejs.MepDefaults, {
+	googleAnalyticsTitle: '',
+	googleAnalyticsCategory: 'Videos',
+	googleAnalyticsEventPlay: 'Play',
+	googleAnalyticsEventPause: 'Pause',
+	googleAnalyticsEventEnded: 'Ended',
+	googleAnalyticsEventTime: 'Time'
+});
+
+
+$.extend(MediaElementPlayer.prototype, {
+	buildgoogleanalytics: function(player, controls, layers, media) {
+			
+		media.addEventListener('play', function() {
+			if (typeof _gaq != 'undefined') {
+				ev = ['_trackEvent',
+					player.options.googleAnalyticsCategory, 
+					player.options.googleAnalyticsEventPlay, 
+					player.media.currentSrc.substring(player.media.currentSrc.lastIndexOf('/')+1)
+				];
+				_gaq.push(ev);
+			}
+		}, false);
+		
+		media.addEventListener('pause', function() {
+			if (typeof _gaq != 'undefined') {
+				ev = ['_trackEvent',
+					player.options.googleAnalyticsCategory, 
+					player.options.googleAnalyticsEventPause, 
+					player.media.currentSrc.substring(player.media.currentSrc.lastIndexOf('/')+1)
+				];
+				_gaq.push(ev);
+			}
+		}, false);	
+		
+		media.addEventListener('ended', function() {
+			if (typeof _gaq != 'undefined') {
+				ev = ['_trackEvent',
+					player.options.googleAnalyticsCategory, 
+					player.options.googleAnalyticsEventEnded, 
+					player.media.currentSrc.substring(player.media.currentSrc.lastIndexOf('/')+1)
+				];
+				_gaq.push(ev);
+			}
+		}, false);
+		
+		/*
+		media.addEventListener('timeupdate', function() {
+			if (typeof _gaq != 'undefined') {
+				_gaq.push(['_trackEvent', 
+					player.options.googleAnalyticsCategory, 
+					player.options.googleAnalyticsEventEnded, 
+					player.options.googleAnalyticsTime,
+					(player.options.googleAnalyticsTitle === '') ? player.currentSrc : player.options.googleAnalyticsTitle,
+					player.currentTime
+				]);
+			}
+		}, true);
+		*/
+	}
+});
+	
+})(mejs.$);
+
 
